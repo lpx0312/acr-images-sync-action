@@ -2,17 +2,31 @@ name: Docker
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
+    inputs:
+      aliyun_registry:
+        description: '阿里云镜像仓库地址'
+        required: true
+        default: 'registry.cn-hangzhou.aliyuncs.com'
+      aliyun_namespace:
+        description: '阿里云命名空间'
+        required: true
+        default: 'lpx03'
+      aliyun_registry_user:
+        description: '阿里云镜像仓库用户名'
+        required: true
+        default: 'lipanx'
+      aliyun_registry_password:
+        description: '阿里云镜像仓库密码'
+        required: true
 
 env:
-  ALIYUN_REGISTRY: "${{ vars.ALIYUN_REGISTRY }}"
-  ALIYUN_NAME_SPACE: "${{ vars.ALIYUN_NAME_SPACE }}"
-  ALIYUN_REGISTRY_USER: "${{ vars.ALIYUN_REGISTRY_USER }}"
-  ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}"
+  ALIYUN_REGISTRY: "${{ github.event.inputs.aliyun_registry }}"
+  ALIYUN_NAME_SPACE: "${{ github.event.inputs.aliyun_namespace }}"
+  ALIYUN_REGISTRY_USER: "${{ github.event.inputs.aliyun_registry_user }}"
+  ALIYUN_REGISTRY_PASSWORD: "${{ github.event.inputs.aliyun_registry_password }}"
   DOCKERHUB_USERNAME: "${{ vars.DOCKERHUB_USERNAME }}"
   DOCKERHUB_PASSWORD: "${{ secrets.DOCKERHUB_PASSWORD }}"
-  
+
 jobs:
   build:
     name: Pull
@@ -23,22 +37,22 @@ jobs:
 
     - name: Install skopeo v1.22.0
       run: |
-        wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64
+        wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64 &> /dev/null
         chmod +x skopeo-linux-amd64
         sudo mv skopeo-linux-amd64 /usr/bin/skopeo
         skopeo --version
 
     - name: Install manifest-tool
       run: |
-        wget https://github.com/estesp/manifest-tool/releases/download/v2.2.1/binaries-manifest-tool-2.2.1.tar.gz
-        tar -zxvf binaries-manifest-tool-2.2.1.tar.gz
+        wget https://github.com/estesp/manifest-tool/releases/download/v2.2.1/binaries-manifest-tool-2.2.1.tar.gz &> /dev/null
+        tar -zxf binaries-manifest-tool-2.2.1.tar.gz &> /dev/null
         chmod +x manifest-tool-linux-amd64
-        sudo mv manifest-tool-linux-amd64 /usr/local/bin/manifest-tool		
-        
+        sudo mv manifest-tool-linux-amd64 /usr/local/bin/manifest-tool
+
     # - name: Install crane
     #   run: |
-    #     curl -LO https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
-    #     tar -zxvf go-containerregistry_Linux_x86_64.tar.gz
+    #     curl -sLO https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
+    #     tar -zxf go-containerregistry_Linux_x86_64.tar.gz &> /dev/null
     #     sudo mv crane /usr/local/bin/
     #     chmod a+x /usr/local/bin/crane
     #     crane version
