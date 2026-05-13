@@ -21,6 +21,12 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Install skopeo v1.22.0
+      run: |
+        wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64
+        chmod +x skopeo-linux-amd64
+        sudo mv skopeo-linux-amd64 /usr/bin/skopeo
+
     - name: Install manifest-tool
       run: |
         wget https://github.com/estesp/manifest-tool/releases/download/v2.2.1/binaries-manifest-tool-2.2.1.tar.gz
@@ -28,13 +34,13 @@ jobs:
         chmod +x manifest-tool-linux-amd64
         sudo mv manifest-tool-linux-amd64 /usr/local/bin/manifest-tool		
         
-    - name: Install crane
-      run: |
-        curl -LO https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
-        tar -zxvf go-containerregistry_Linux_x86_64.tar.gz
-        sudo mv crane /usr/local/bin/
-        chmod a+x /usr/local/bin/crane
-        crane version
-        
+    # - name: Install crane
+    #   run: |
+    #     curl -LO https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
+    #     tar -zxvf go-containerregistry_Linux_x86_64.tar.gz
+    #     sudo mv crane /usr/local/bin/
+    #     chmod a+x /usr/local/bin/crane
+    #     crane version
+
     - name: Sync images using Skopeo (Python Fast Sync)
       run: python3 .github/scripts/sync.py
