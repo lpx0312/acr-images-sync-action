@@ -3,7 +3,7 @@ name: Docker
 on:
   workflow_dispatch:
   push:
-    branches: [ docker-sync ]
+    branches: [ main ]
 
 env:
   ALIYUN_REGISTRY: "${{ vars.ALIYUN_REGISTRY }}"
