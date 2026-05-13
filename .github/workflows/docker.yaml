@@ -26,6 +26,7 @@ jobs:
         wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64
         chmod +x skopeo-linux-amd64
         sudo mv skopeo-linux-amd64 /usr/bin/skopeo
+        skopeo --version
 
     - name: Install manifest-tool
       run: |
