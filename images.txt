@@ -1,1 +1,3 @@
+sonatype/nexus3:3.78.0
+openeuler:22.03-lts-sp4
 tonistiigi/binfmt:qemu-v10.2.1
