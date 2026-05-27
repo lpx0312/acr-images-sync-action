@@ -1,5 +1,1 @@
-maven:3.9.6
-maven:3.9.6-eclipse-temurin-8-focal
-maven:3.9.7
-eipwork/kuboard-spray:v1.2.4-amd64
-quay.io/prometheus/prometheus:latest
+nginx:1.27.0
