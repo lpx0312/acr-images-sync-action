@@ -1,1 +1,1 @@
-nginx:1.25-alpine
+rancher/local-path-provisioner:v0.0.35
