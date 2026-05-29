@@ -1,1 +1,2 @@
-gradle:8.13.0
+maven:3.9.6
+gradle:8.13-jdk8
