@@ -1,4 +1,3 @@
 ghcr.io/chaos-mesh/chaos-mesh:v2.8.2
 ghcr.io/chaos-mesh/chaos-daemon:v2.8.2
 ghcr.io/chaos-mesh/chaos-dashboard:v2.8.2
-ghcr.io/chaos-mesh/chaos-dns-server:v2.8.2
