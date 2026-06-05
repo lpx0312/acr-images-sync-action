@@ -1,1 +1,1 @@
-ghcr.io/chaos-mesh/chaos-coredns:v2.8.2
+ghcr.io/chaos-mesh/chaos-coredns:v0.2.8
