@@ -1,1 +1,1 @@
-ghcr.io/chaos-mesh/chaos-coredns:v0.2.8
+eipwork/kuboard:v3
