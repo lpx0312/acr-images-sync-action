@@ -1,7 +1,1 @@
-quay.io/argoproj/argocd:v3.4.3
-quay.io/argoproj/argocd-applicationset-controller:v3.4.3
-quay.io/argoproj/argocd-dex-server:v3.4.3
-quay.io/argoproj/argocd-notifications-controller:v3.4.3
-quay.io/argoproj/argocd-repo-server:v3.4.3
-quay.io/argoproj/argocd-server:v3.4.3
-ghcr.io/dexidp/dex:v2.45.0
+public.ecr.aws/docker/library/redis:8.2.3-alpine
