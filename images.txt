@@ -1,1 +1,1 @@
-quay.io/argoprojlabs/argocd-image-updater:v1.2.1
+nginx:1.21
