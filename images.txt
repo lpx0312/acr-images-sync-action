@@ -1,1 +1,1 @@
-nginx:1.24.0
+ghcr.io/opencmit/pangee-cluster:latest
