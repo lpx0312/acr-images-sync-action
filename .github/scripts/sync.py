@@ -22,6 +22,8 @@ ALIYUN_REGISTRY_USER = os.getenv("ALIYUN_REGISTRY_USER")
 ALIYUN_REGISTRY_PASSWORD = os.getenv("ALIYUN_REGISTRY_PASSWORD")
 DOCKERHUB_USERNAME = os.getenv("DOCKERHUB_USERNAME")
 DOCKERHUB_PASSWORD = os.getenv("DOCKERHUB_PASSWORD")
+GHCR_USERNAME = os.getenv("GHCR_USERNAME")
+GHCR_TOKEN = os.getenv("GHCR_TOKEN")
 
 SUPPORTED_ARCH = [
     ("linux", "amd64"),
@@ -132,6 +134,20 @@ async def skopeo_login():
             _log("[LOGIN] dockerhub success")
     else:
         _log("[WARN] dockerhub credential not found, skip login")
+    if GHCR_USERNAME and GHCR_TOKEN:
+        _log("[LOGIN] ghcr.io")
+        rc, out, err = await run_cmd([
+            "skopeo", "login",
+            "-u", GHCR_USERNAME,
+            "-p", GHCR_TOKEN,
+            "ghcr.io"
+        ], timeout=60)
+        if rc != 0:
+            _log(f"[WARN] ghcr.io login failed: {err}")
+        else:
+            _log("[LOGIN] ghcr.io success")
+    else:
+        _log("[WARN] ghcr.io credential not found, skip login")
 
 # ------------------ parse images ------------------
 

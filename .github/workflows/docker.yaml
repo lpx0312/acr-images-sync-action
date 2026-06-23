@@ -26,6 +26,8 @@ env:
   ALIYUN_REGISTRY_PASSWORD: "${{ github.event.inputs.aliyun_registry_password }}"
   DOCKERHUB_USERNAME: "${{ vars.DOCKERHUB_USERNAME }}"
   DOCKERHUB_PASSWORD: "${{ secrets.DOCKERHUB_PASSWORD }}"
+  GHCR_USERNAME: "${{ vars.GHCR_USERNAME }}"
+  GHCR_TOKEN: "${{ secrets.GHCR_TOKEN }}"
 
 jobs:
   build:
