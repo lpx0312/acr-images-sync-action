@@ -1,1 +1,3 @@
-rancher/rancher:v2.12.3
+quay.io/jetstack/cert-manager-cainjector:v0.12.0
+quay.io/jetstack/cert-manager-controller:v0.12.0
+quay.io/jetstack/cert-manager-webhook:v0.12.0
