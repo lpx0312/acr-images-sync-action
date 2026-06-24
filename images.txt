@@ -1,1 +1,1 @@
-openksc/ks-apiserver:v4.1.3
+openksc/kubectl:v1.27.16
