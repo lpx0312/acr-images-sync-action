@@ -1,1 +1,1 @@
-hub.kubesphere.com.cn/kubesphereio/redis:7.2.12-alpine
+openksc/ks-console:v4.1.3
