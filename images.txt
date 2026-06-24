@@ -1,1 +1,1 @@
-ghcr.io/opencmit/pangee-cluster:latest
+rancher/rancher:v2.12.3
