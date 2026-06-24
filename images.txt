@@ -1,1 +1,1 @@
-openksc/kubectl:v1.27.16
+openksc/kubectl:v1.27.12
