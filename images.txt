@@ -1,5 +1,1 @@
-openksc/ks-extensions-museum:v1.1.4
-openksc/ks-apiserver:v3.4.1
-openksc/ks-console:v3.4.1
-openksc/ks-controller-manager:v4.1.3
-openksc/kubectl:v1.33.1
+hub.kubesphere.com.cn/kubesphereio/redis:7.2.12-alpine
