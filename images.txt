@@ -1,1 +1,1 @@
-hub.kubesphere.com.cn/kubesphere/kubectl:v1.27.4
+kubesphere/devops-apiserver:v4.1.3
