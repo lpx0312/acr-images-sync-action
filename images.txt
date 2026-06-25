@@ -1,1 +1,1 @@
-openksc/kubectl:v1.27.12
+openksc/ks-extensions-museum:v1.1.3
