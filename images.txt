@@ -1,1 +1,1 @@
-openksc/ks-extensions-museum:v1.1.3
+kubesphereon/ks-extensions-museum:v1.1.3
