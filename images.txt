@@ -1,6 +1,1 @@
-hub.kubesphere.com.cn/kubesphere/devops-extension-frontend:v4.1.3
-hub.kubesphere.com.cn/kubesphere/devops-apiserver:v4.1.3
-hub.kubesphere.com.cn/kubesphere/devops-controller:v4.1.3
-hub.kubesphere.com.cn/kubesphere/devops-tools:v4.1.3
-hub.kubesphere.com.cn/kubesphere/builder-base:v4.1.3
-hub.kubesphere.com.cn/kubesphere/builder-base:v4.1.3-podman
+opensearchproject/opensearch-dashboards:2.8.0
