@@ -1,1 +1,1 @@
-bats/bats:v1.4.1
+opensearchproject/opensearch-dashboards:2.8.0
