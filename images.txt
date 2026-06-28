@@ -1,1 +1,1 @@
-opensearchproject/opensearch-dashboards:2.8.0
+eclipse-temurin:8-jdk-noble
