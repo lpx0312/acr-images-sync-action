@@ -1,1 +1,1 @@
-elastic/filebeat:6.7.0
+kubesphere/builder-base:v3.2.2-podman
