@@ -1,1 +1,5 @@
-kubesphere/builder-base:v3.2.2-podman
+reg.kyverno.io/kyverno/kyverno:v1.16.4
+reg.kyverno.io/kyverno/kyvernopre:v1.16.4
+reg.kyverno.io/kyverno/background-controller:v1.16.4
+reg.kyverno.io/kyverno/cleanup-controller:v1.16.4
+reg.kyverno.io/kyverno/reports-controller:v1.16.4
