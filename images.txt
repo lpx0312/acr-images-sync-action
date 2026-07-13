@@ -1,1 +1,5 @@
-eclipse-temurin:21-jdk-jammy
+redis:6.2.22
+redis:7.2.11
+redis:7.4.9
+redis:8.0.6
+redis:8.2.7
