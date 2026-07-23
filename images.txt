@@ -1,1 +1,1 @@
-mysql:8.0
+eclipse-temurin:11-jdk-alpine
