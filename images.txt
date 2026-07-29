@@ -1,1 +1,1 @@
-eclipse-temurin:11-jdk-alpine
+gradle:6.8.3-jdk8
