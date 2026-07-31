@@ -1,1 +1,1 @@
-jayfong/yapi:1.9.2
+mongo:4.4.5
