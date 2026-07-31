@@ -1,1 +1,1 @@
-opsxlab/xxl-job-admin:2.2.0
+jayfong/yapi:1.9.2
