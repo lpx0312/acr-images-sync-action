@@ -1,1 +1,1 @@
-busybox:latest
+postgres:17.11-bookworm
