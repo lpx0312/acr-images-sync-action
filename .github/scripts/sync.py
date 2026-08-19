@@ -35,9 +35,11 @@ SUPPORTED_ARCH = [
 ]
 
 
-def _is_swr(registry: str) -> bool:
-    # 华为云 SWR 基础版拒收顶层 OCI image index，推送时需强制转换为 Docker v2s2/manifest list
-    return "myhuaweicloud.com" in (registry or "")
+def _needs_v2s2(registry: str) -> bool:
+    # 华为云 SWR 基础版拒收顶层 OCI image index，推送时需强制转换为 Docker v2s2/manifest list；
+    # 腾讯云 CCR 个人版同样按 v2s2 处理，保证 manifest list 兼容
+    host = (registry or "").lower()
+    return "myhuaweicloud.com" in host or "tencentyun.com" in host
 
 
 # 推送目标：dispatch 传入的主目标 + 固定附加目标（华为云 SWR，来自仓库 vars/secrets）
@@ -361,7 +363,7 @@ async def sync_image_task(image: str, duplicates: Dict[str, bool], semaphore: as
                 failed_targets = []
                 for target in PUSH_TARGETS:
                     final_target = build_target(image, duplicates, target)
-                    force_v2s2 = _is_swr(target["registry"])
+                    force_v2s2 = _needs_v2s2(target["registry"])
                     try:
                         if img_type == "single" or len(arch_list) < len(SUPPORTED_ARCH):
                             # 单架构或者缺失某些白名单架构
