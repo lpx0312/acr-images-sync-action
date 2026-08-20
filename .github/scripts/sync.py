@@ -20,14 +20,13 @@ TARGET_REGISTRY = os.getenv("TARGET_REGISTRY")
 TARGET_NAMESPACE = os.getenv("TARGET_NAMESPACE")
 TARGET_USER = os.getenv("TARGET_USER")
 TARGET_PASSWORD = os.getenv("TARGET_PASSWORD")
-HUAWEI_REGISTRY = os.getenv("HUAWEI_REGISTRY")
-HUAWEI_NAMESPACE = os.getenv("HUAWEI_NAMESPACE")
-HUAWEI_REGISTRY_USER = os.getenv("HUAWEI_REGISTRY_USER")
-HUAWEI_REGISTRY_PASSWORD = os.getenv("HUAWEI_REGISTRY_PASSWORD")
+# 源镜像仓库拉取凭据（可选）：仅用于拉取侧，与推送目标无关
 DOCKERHUB_USERNAME = os.getenv("DOCKERHUB_USERNAME")
 DOCKERHUB_PASSWORD = os.getenv("DOCKERHUB_PASSWORD")
 GHCR_USERNAME = os.getenv("GHCR_USERNAME")
 GHCR_TOKEN = os.getenv("GHCR_TOKEN")
+QUAY_USERNAME = os.getenv("QUAY_USERNAME")
+QUAY_PASSWORD = os.getenv("QUAY_PASSWORD")
 
 SUPPORTED_ARCH = [
     ("linux", "amd64"),
@@ -42,24 +41,13 @@ def _needs_v2s2(registry: str) -> bool:
     return "myhuaweicloud.com" in host or "tencentyun.com" in host
 
 
-# 推送目标：dispatch 传入的主目标 + 固定附加目标（华为云 SWR，来自仓库 vars/secrets）
-PRIMARY_TARGET = {
+# 唯一推送目标：完全由 workflow_dispatch inputs（后端平台按所选目标仓库配置）传入
+TARGET = {
     "registry": TARGET_REGISTRY,
     "namespace": TARGET_NAMESPACE,
     "user": TARGET_USER,
     "password": TARGET_PASSWORD,
 }
-PUSH_TARGETS = [PRIMARY_TARGET]
-if all([HUAWEI_REGISTRY, HUAWEI_NAMESPACE, HUAWEI_REGISTRY_USER, HUAWEI_REGISTRY_PASSWORD]):
-    if HUAWEI_REGISTRY != TARGET_REGISTRY:
-        PUSH_TARGETS.append({
-            "registry": HUAWEI_REGISTRY,
-            "namespace": HUAWEI_NAMESPACE,
-            "user": HUAWEI_REGISTRY_USER,
-            "password": HUAWEI_REGISTRY_PASSWORD,
-        })
-    else:
-        print("NOTE: extra target registry same as primary, skip duplicate", file=sys.stderr)
 
 if not all([TARGET_REGISTRY, TARGET_NAMESPACE, TARGET_USER, TARGET_PASSWORD]):
     print("ERROR: missing target registry env", file=sys.stderr)
@@ -141,7 +129,8 @@ def dockerhub_inspect_copy_refs(source_ref: str) -> List[str]:
 # ------------------ login ------------------
 
 async def skopeo_login():
-    _log(f"[LOGIN] primary target {TARGET_REGISTRY}")
+    # 登录推送目标：由 dispatch 传入，失败即终止
+    _log(f"[LOGIN] target {TARGET_REGISTRY}")
     rc, out, err = await run_cmd([
         "skopeo", "login",
         "-u", TARGET_USER,
@@ -151,46 +140,29 @@ async def skopeo_login():
     if rc != 0:
         _log(err)
         sys.exit(1)
-    for extra in PUSH_TARGETS[1:]:
-        _log(f"[LOGIN] extra target {extra['registry']}")
+    _log("[LOGIN] target success")
+
+    # 登录源镜像仓库（可选，仅拉取侧）：未配置凭据则匿名拉取
+    source_logins = [
+        ("docker.io", DOCKERHUB_USERNAME, DOCKERHUB_PASSWORD),
+        ("ghcr.io", GHCR_USERNAME, GHCR_TOKEN),
+        ("quay.io", QUAY_USERNAME, QUAY_PASSWORD),
+    ]
+    for registry, user, password in source_logins:
+        if not (user and password):
+            _log(f"[WARN] {registry} credential not found, pull anonymously")
+            continue
+        _log(f"[LOGIN] source {registry}")
         rc, out, err = await run_cmd([
             "skopeo", "login",
-            "-u", extra["user"],
-            "-p", extra["password"],
-            extra["registry"]
+            "-u", user,
+            "-p", password,
+            registry
         ], timeout=60)
         if rc != 0:
-            _log(f"[WARN] extra target login failed: {err}")
+            _log(f"[WARN] {registry} login failed: {err}")
         else:
-            _log(f"[LOGIN] extra target success")
-    if DOCKERHUB_USERNAME and DOCKERHUB_PASSWORD:
-        _log("[LOGIN] dockerhub")
-        rc, out, err = await run_cmd([
-            "skopeo", "login",
-            "-u", DOCKERHUB_USERNAME,
-            "-p", DOCKERHUB_PASSWORD,
-            "docker.io"
-        ], timeout=60)
-        if rc != 0:
-            _log(f"[WARN] dockerhub login failed: {err}")
-        else:
-            _log("[LOGIN] dockerhub success")
-    else:
-        _log("[WARN] dockerhub credential not found, skip login")
-    if GHCR_USERNAME and GHCR_TOKEN:
-        _log("[LOGIN] ghcr.io")
-        rc, out, err = await run_cmd([
-            "skopeo", "login",
-            "-u", GHCR_USERNAME,
-            "-p", GHCR_TOKEN,
-            "ghcr.io"
-        ], timeout=60)
-        if rc != 0:
-            _log(f"[WARN] ghcr.io login failed: {err}")
-        else:
-            _log("[LOGIN] ghcr.io success")
-    else:
-        _log("[WARN] ghcr credential not found, skip login")
+            _log(f"[LOGIN] source {registry} success")
 
 # ------------------ parse images ------------------
 
@@ -351,82 +323,63 @@ async def sync_image_task(image: str, duplicates: Dict[str, bool], semaphore: as
         start_ts = time.time()
         source_ref, _ = normalize_image_reference(image)
         copy_refs = dockerhub_inspect_copy_refs(source_ref)
+        final_target = build_target(image, duplicates, TARGET)
 
         for attempt in range(1, RETRY_COUNT + 2):
             temp_targets = []
             try:
-                _log(f"[{index}] START {image} attempt={attempt} targets={len(PUSH_TARGETS)}")
+                _log(f"[{index}] START {image} attempt={attempt} target={final_target}")
 
-                # 架构探测只做一次，与推送目标无关
                 img_type, arch_list = await inspect_architectures(source_ref, index)
+                force_v2s2 = _needs_v2s2(TARGET["registry"])
 
-                failed_targets = []
-                for target in PUSH_TARGETS:
-                    final_target = build_target(image, duplicates, target)
-                    force_v2s2 = _needs_v2s2(target["registry"])
-                    try:
-                        if img_type == "single" or len(arch_list) < len(SUPPORTED_ARCH):
-                            # 单架构或者缺失某些白名单架构
-                            os_name, arch = arch_list[0]
-                            await sync_single_arch(copy_refs, final_target, os_name, arch, index, force_v2s2)
-                        else:
-                            # 多架构
-                            valid_platforms = []
-                            for os_name, arch in SUPPORTED_ARCH:
-                                if (os_name, arch) not in arch_list:
-                                    continue
-                                temp_target = f"{final_target}-{arch}-tmp"
-                                await sync_single_arch(copy_refs, temp_target, os_name, arch, index, force_v2s2)
-                                temp_targets.append(temp_target)
-                                valid_platforms.append(f"{os_name}/{arch}")
+                if img_type == "single" or len(arch_list) < len(SUPPORTED_ARCH):
+                    # 单架构或者缺失某些白名单架构
+                    os_name, arch = arch_list[0]
+                    await sync_single_arch(copy_refs, final_target, os_name, arch, index, force_v2s2)
+                else:
+                    # 多架构
+                    valid_platforms = []
+                    for os_name, arch in SUPPORTED_ARCH:
+                        if (os_name, arch) not in arch_list:
+                            continue
+                        temp_target = f"{final_target}-{arch}-tmp"
+                        await sync_single_arch(copy_refs, temp_target, os_name, arch, index, force_v2s2)
+                        temp_targets.append(temp_target)
+                        valid_platforms.append(f"{os_name}/{arch}")
 
-                            if not valid_platforms:
-                                raise Exception("no supported arch found")
+                    if not valid_platforms:
+                        raise Exception("no supported arch found")
 
-                            # 多架构成功 → manifest merge
-                            if len(valid_platforms) >= 2:
-                                await manifest_merge(final_target, valid_platforms, index, target["user"], target["password"])
-
-                            # 删除临时镜像
-                            #for item in temp_targets_of_target:
-                            #    await delete_temp_image(item, index, target["user"], target["password"])
-
-                        _log(f"[{index}] TARGET OK ({time.time() - start_ts:.1f}s) -> {final_target}")
-                    except Exception as te:
-                        failed_targets.append((final_target, str(te)))
-                        _log(f"[{index}] TARGET FAILED -> {final_target}: {str(te).strip()[:300]}")
-
-                if failed_targets:
-                    summary = "; ".join(f"{t}: {e.strip()[:150]}" for t, e in failed_targets)
-                    raise Exception(f"{len(failed_targets)}/{len(PUSH_TARGETS)} targets failed: {summary}")
+                    # 多架构成功 → manifest merge
+                    if len(valid_platforms) >= 2:
+                        await manifest_merge(final_target, valid_platforms, index, TARGET["user"], TARGET["password"])
 
                 elapsed = time.time() - start_ts
-                _log(f"[{index}] SUCCESS ({elapsed:.1f}s) all {len(PUSH_TARGETS)} targets -> {build_target(image, duplicates, PRIMARY_TARGET)}")
-                return 0, build_target(image, duplicates, PRIMARY_TARGET)
+                _log(f"[{index}] SUCCESS ({elapsed:.1f}s) -> {final_target}")
+                return 0, final_target
 
             except Exception as e:
                 err_msg = str(e)
                 _log(f"[{index}] FAILED attempt={attempt}: {err_msg[:500]}")
                 for item in temp_targets:
-                    for target in PUSH_TARGETS:
-                        if item.startswith(f"{target['registry']}/"):
-                            try:
-                                await delete_temp_image(item, index, target["user"], target["password"])
-                            except:
-                                pass
+                    try:
+                        await delete_temp_image(item, index, TARGET["user"], TARGET["password"])
+                    except:
+                        pass
                 backoff = 300 if "toomanyrequests" in err_msg.lower() else min(30*(2**(attempt-1)),300)
                 if attempt <= RETRY_COUNT:
                     _log(f"[{index}] retry after {backoff}s")
                     await asyncio.sleep(backoff)
                 else:
-                    return 1, build_target(image, duplicates, PRIMARY_TARGET)
+                    return 1, final_target
 
 # ------------------ main ------------------
 
 async def main():
     _open_log()
     _log(f"CONFIG: MAX_CONCURRENT={MAX_CONCURRENT} RETRY_COUNT={RETRY_COUNT} PER_IMAGE_TIMEOUT={PER_IMAGE_TIMEOUT}")
-    _log(f"TARGETS: {[(t['registry'], t['namespace']) for t in PUSH_TARGETS]}")
+    _log(f"TARGET: {TARGET_REGISTRY}/{TARGET_NAMESPACE}")
     await skopeo_login()
     lines = parse_images_file(IMAGES_FILE)
     duplicates = detect_duplicates(lines)
