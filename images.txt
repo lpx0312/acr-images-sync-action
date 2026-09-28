@@ -1,3 +1,1 @@
-linuxserver/code-server:version-4.92.2
-linuxserver/code-server:version-4.118.0
-linuxserver/code-server:version-4.138.0
+eclipse-temurin:25-jdk-noble
