@@ -19,9 +19,10 @@ PER_IMAGE_TIMEOUT = int(os.getenv("PER_IMAGE_TIMEOUT", str(10 * 60)))
 # mirror.gcr.io 挂死时是 0 进度静默卡住（inspect 正常、copy 第一层就停），
 # 给它单独一个更短的超时，快速失败切回 docker.io
 MIRROR_TIMEOUT = int(os.getenv("MIRROR_TIMEOUT", str(5 * 60)))
-# 推送步超时：海外 runner → 国内仓库跨境带宽约 0.5~1MB/s/连接，
-# ~700MB 的 gzip 层 600s 传不完（ACR/SWR 均实测超时），推送单独给大预算
-PUSH_TIMEOUT = int(os.getenv("PUSH_TIMEOUT", str(30 * 60)))
+# 推送步超时：海外 runner → 国内仓库跨境聚合带宽实测仅 ~0.4MB/s（8 路并行也提不上去，
+# 疑似仓库侧按实例限速），~700MB gzip 单架构需 ~30min，且 ACR 个人版不留存未引用 blob、
+# 无法断点续传——预算必须一次给足
+PUSH_TIMEOUT = int(os.getenv("PUSH_TIMEOUT", str(45 * 60)))
 IMAGE_PARALLEL_COPIES = os.getenv("IMAGE_PARALLEL_COPIES", "8")
 LOG_FILE = os.getenv("SYNC_LOG_FILE", "sync.log")
 

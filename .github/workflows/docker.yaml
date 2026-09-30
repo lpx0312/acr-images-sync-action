@@ -38,9 +38,9 @@ jobs:
   build:
     name: Pull
     runs-on: ubuntu-latest
-    # 兜底：跨境推送 ~700MB/架构在 PUSH_TIMEOUT=1800s 预算下，
-    # 单镜像双架构一次尝试约 70 分钟，留一次重试余量
-    timeout-minutes: 150
+    # 兜底：跨境 ~0.4MB/s 下双架构推送各需 ~30min+，加重试余量；
+    # 真正的根治是内网/国内 self-hosted runner（见 AGENTS 例外条款）
+    timeout-minutes: 330
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
