@@ -7,6 +7,8 @@ import sys
 import time
 import json
 import shlex
+import shutil
+import tempfile
 from typing import List, Dict, Tuple
 
 IMAGES_FILE = "images.txt"
@@ -40,8 +42,8 @@ SUPPORTED_ARCH = [
 def _needs_v2s2(registry: str) -> bool:
     # 华为云 SWR 基础版拒收顶层 OCI image index，推送时需强制转换为 Docker v2s2/manifest list；
     # 腾讯云 CCR 个人版同样按 v2s2 处理，保证 manifest list 兼容；
-    # 阿里云 ACR 个人版不识别 zstd 压缩层（报 blob type invalid），
-    # v2s2 转换会把 zstd 层重压缩为 gzip
+    # 阿里云 ACR 个人版不识别 zstd 压缩层（报 blob type invalid）。
+    # 这些仓库统一走 v2s2 + gzip：见 _copy_with_recompression
     host = (registry or "").lower()
     return (
         "myhuaweicloud.com" in host
@@ -300,29 +302,70 @@ async def inspect_architectures(source_ref: str, index: int) -> Tuple[str, List[
 
 # ------------------ sync single arch ------------------
 
+async def _copy_with_recompression(
+    source_ref: str, target_ref: str, os_name: str, arch: str, index: int, timeout: int
+) -> Tuple[int, str]:
+    """
+    两步 copy，用于不兼容 zstd/OCI 的目标仓库（华为云 SWR/腾讯云 CCR/阿里云 ACR 个人版）：
+    1) 源镜像 → 本地 dir（--dest-decompress 解压所有层）
+    2) 本地 dir → 目标（--dest-compress-format gzip 重新压缩 + --format v2s2）
+    单步 --format v2s2 不会重压缩已有 zstd 层，会在 blob 上传或 manifest 转换时被拒。
+    返回 (returncode, errmsg)。
+    """
+    workdir = tempfile.mkdtemp(prefix=f"skopeo-{index}-{arch}-")
+    try:
+        dir_ref = f"dir:{workdir}"
+        step1 = [
+            "skopeo", "copy",
+            "--override-os", os_name,
+            "--override-arch", arch,
+            "--retry-times", "3",
+            source_ref, dir_ref,
+            "--dest-decompress",
+        ]
+        _log(f"[{index}] SKOPEO_COPY step1/2 (pull & decompress): {shlex.join(step1)}")
+        rc, out, err = await run_cmd(step1, timeout=timeout, stream=True, log_prefix=f"[{index}] ")
+        if rc != 0:
+            return rc, err
+
+        step2 = [
+            "skopeo", "copy",
+            "--retry-times", "3",
+            "--format", "v2s2",
+            "--dest-compress-format", "gzip",
+            dir_ref, f"docker://{target_ref}",
+        ]
+        _log(f"[{index}] SKOPEO_COPY step2/2 (gzip + v2s2 push): {shlex.join(step2)}")
+        rc, out, err = await run_cmd(step2, timeout=PER_IMAGE_TIMEOUT, stream=True, log_prefix=f"[{index}] ")
+        return rc, err
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
 async def sync_single_arch(
     source_refs: List[str], target_ref: str, os_name: str, arch: str, index: int,
     force_v2s2: bool = False
 ):
     """
     For docker.io images source_refs is [mirror.gcr.io, docker.io]; try in order until one succeeds.
-    force_v2s2: 目标为不兼容 OCI/zstd 的国内仓库时强制转换为 Docker v2s2。
+    force_v2s2: 目标仓库不兼容 OCI/zstd 时走两步重压缩（见 _copy_with_recompression）。
     """
     last_err = ""
     for ri, source_ref in enumerate(source_refs):
         timeout = MIRROR_TIMEOUT if "mirror.gcr.io" in source_ref else PER_IMAGE_TIMEOUT
         _log(f"[{index}] COPY {os_name}/{arch} source={ri + 1}/{len(source_refs)} timeout={timeout}s {source_ref}")
-        cmd = [
-            "skopeo", "copy",
-            "--override-os", os_name,
-            "--override-arch", arch,
-            "--retry-times", "3",
-        ]
         if force_v2s2:
-            cmd += ["--format", "v2s2"]
-        cmd += [source_ref, f"docker://{target_ref}"]
-        _log(f"[{index}] SKOPEO_COPY: {shlex.join(cmd)}")
-        rc, out, err = await run_cmd(cmd, timeout=timeout, stream=True, log_prefix=f"[{index}] ")
+            rc, err = await _copy_with_recompression(source_ref, target_ref, os_name, arch, index, timeout)
+        else:
+            cmd = [
+                "skopeo", "copy",
+                "--override-os", os_name,
+                "--override-arch", arch,
+                "--retry-times", "3",
+                source_ref, f"docker://{target_ref}",
+            ]
+            _log(f"[{index}] SKOPEO_COPY: {shlex.join(cmd)}")
+            rc, out, err = await run_cmd(cmd, timeout=timeout, stream=True, log_prefix=f"[{index}] ")
         if rc == 0:
             return
         last_err = err
