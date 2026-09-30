@@ -38,21 +38,24 @@ jobs:
   build:
     name: Pull
     runs-on: ubuntu-latest
+    # 兜底：单镜像最坏路径（多架构 × 多源 × 重试）约 90 分钟，超过即强制终止，
+    # 避免挂在 GitHub 默认 6 小时超时上
+    timeout-minutes: 90
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
     - name: Install skopeo v1.22.0
       run: |
-        wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64 &> /dev/null
+        wget https://github.com/lework/skopeo-binary/releases/download/v1.22.0/skopeo-linux-amd64
         chmod +x skopeo-linux-amd64
         sudo mv skopeo-linux-amd64 /usr/bin/skopeo
         skopeo --version
 
     - name: Install manifest-tool
       run: |
-        wget https://github.com/estesp/manifest-tool/releases/download/v2.2.1/binaries-manifest-tool-2.2.1.tar.gz &> /dev/null
-        tar -zxf binaries-manifest-tool-2.2.1.tar.gz &> /dev/null
+        wget https://github.com/estesp/manifest-tool/releases/download/v2.2.1/binaries-manifest-tool-2.2.1.tar.gz
+        tar -zxf binaries-manifest-tool-2.2.1.tar.gz
         chmod +x manifest-tool-linux-amd64
         sudo mv manifest-tool-linux-amd64 /usr/local/bin/manifest-tool
 

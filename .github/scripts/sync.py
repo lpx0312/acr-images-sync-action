@@ -13,7 +13,10 @@ IMAGES_FILE = "images.txt"
 
 MAX_CONCURRENT = int(os.getenv("MAX_CONCURRENT", "8"))
 RETRY_COUNT = int(os.getenv("RETRY_COUNT", "2"))
-PER_IMAGE_TIMEOUT = int(os.getenv("PER_IMAGE_TIMEOUT", str(20 * 60)))
+PER_IMAGE_TIMEOUT = int(os.getenv("PER_IMAGE_TIMEOUT", str(10 * 60)))
+# mirror.gcr.io 挂死时是 0 进度静默卡住（inspect 正常、copy 第一层就停），
+# 给它单独一个更短的超时，快速失败切回 docker.io
+MIRROR_TIMEOUT = int(os.getenv("MIRROR_TIMEOUT", str(5 * 60)))
 LOG_FILE = os.getenv("SYNC_LOG_FILE", "sync.log")
 
 TARGET_REGISTRY = os.getenv("TARGET_REGISTRY")
@@ -36,9 +39,15 @@ SUPPORTED_ARCH = [
 
 def _needs_v2s2(registry: str) -> bool:
     # 华为云 SWR 基础版拒收顶层 OCI image index，推送时需强制转换为 Docker v2s2/manifest list；
-    # 腾讯云 CCR 个人版同样按 v2s2 处理，保证 manifest list 兼容
+    # 腾讯云 CCR 个人版同样按 v2s2 处理，保证 manifest list 兼容；
+    # 阿里云 ACR 个人版不识别 zstd 压缩层（报 blob type invalid），
+    # v2s2 转换会把 zstd 层重压缩为 gzip
     host = (registry or "").lower()
-    return "myhuaweicloud.com" in host or "tencentyun.com" in host
+    return (
+        "myhuaweicloud.com" in host
+        or "tencentyun.com" in host
+        or "aliyuncs.com" in host
+    )
 
 
 # 唯一推送目标：完全由 workflow_dispatch inputs（后端平台按所选目标仓库配置）传入
@@ -78,22 +87,57 @@ def _log(msg: str):
 
 # ------------------ run command ------------------
 
-async def run_cmd(cmd: List[str], timeout: int = None):
+async def _pump_stream(stream, log_prefix: str) -> str:
+    """逐行实时打印子进程输出并返回累计文本，避免 skopeo 卡住时日志长时间静默。"""
+    chunks = []
+    while True:
+        line = await stream.readline()
+        if not line:
+            break
+        text = line.decode(errors="ignore").rstrip("\r\n")
+        if text:
+            _log(f"{log_prefix}| {text}")
+            chunks.append(text + "\n")
+    return "".join(chunks)
+
+
+async def run_cmd(cmd: List[str], timeout: int = None, stream: bool = False, log_prefix: str = ""):
+    """
+    stream=True: 子进程输出逐行实时写入日志（用于耗时的 copy/manifest 操作）；
+    默认静默捕获（inspect --raw 的 JSON 不适合刷日志）。
+    """
     proc = None
+    pumps = []
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
+        if stream:
+            pumps = [
+                asyncio.create_task(_pump_stream(proc.stdout, log_prefix)),
+                asyncio.create_task(_pump_stream(proc.stderr, log_prefix)),
+            ]
+            await asyncio.wait_for(proc.wait(), timeout=timeout)
+            outs, errs = await asyncio.gather(*pumps)
+            return proc.returncode, outs, errs
         outs, errs = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         return proc.returncode, outs.decode(errors="ignore"), errs.decode(errors="ignore")
     except asyncio.TimeoutError:
         if proc:
             try: proc.kill()
             except: pass
+        for t in pumps:
+            t.cancel()
+        if pumps:
+            await asyncio.gather(*pumps, return_exceptions=True)
         return 124, "", f"TIMEOUT after {timeout}s"
     except Exception as e:
+        for t in pumps:
+            t.cancel()
+        if pumps:
+            await asyncio.gather(*pumps, return_exceptions=True)
         return 125, "", str(e)
 
 # ------------------ normalize image ------------------
@@ -262,11 +306,12 @@ async def sync_single_arch(
 ):
     """
     For docker.io images source_refs is [mirror.gcr.io, docker.io]; try in order until one succeeds.
-    force_v2s2: 目标为华为云 SWR 时强制转换为 Docker v2s2，避免 SWR 拒收 OCI manifest。
+    force_v2s2: 目标为不兼容 OCI/zstd 的国内仓库时强制转换为 Docker v2s2。
     """
     last_err = ""
     for ri, source_ref in enumerate(source_refs):
-        _log(f"[{index}] COPY {os_name}/{arch} source={ri + 1}/{len(source_refs)} {source_ref}")
+        timeout = MIRROR_TIMEOUT if "mirror.gcr.io" in source_ref else PER_IMAGE_TIMEOUT
+        _log(f"[{index}] COPY {os_name}/{arch} source={ri + 1}/{len(source_refs)} timeout={timeout}s {source_ref}")
         cmd = [
             "skopeo", "copy",
             "--override-os", os_name,
@@ -277,7 +322,7 @@ async def sync_single_arch(
             cmd += ["--format", "v2s2"]
         cmd += [source_ref, f"docker://{target_ref}"]
         _log(f"[{index}] SKOPEO_COPY: {shlex.join(cmd)}")
-        rc, out, err = await run_cmd(cmd, timeout=PER_IMAGE_TIMEOUT)
+        rc, out, err = await run_cmd(cmd, timeout=timeout, stream=True, log_prefix=f"[{index}] ")
         if rc == 0:
             return
         last_err = err
@@ -300,7 +345,7 @@ async def manifest_merge(final_target: str, valid_platforms: List[str], index: i
         "--template", template,
         "--target", final_target
     ]
-    rc, out, err = await run_cmd(cmd, timeout=300)
+    rc, out, err = await run_cmd(cmd, timeout=300, stream=True, log_prefix=f"[{index}] ")
     if rc != 0:
         raise Exception(err)
 
@@ -378,7 +423,10 @@ async def sync_image_task(image: str, duplicates: Dict[str, bool], semaphore: as
 
 async def main():
     _open_log()
-    _log(f"CONFIG: MAX_CONCURRENT={MAX_CONCURRENT} RETRY_COUNT={RETRY_COUNT} PER_IMAGE_TIMEOUT={PER_IMAGE_TIMEOUT}")
+    _log(
+        f"CONFIG: MAX_CONCURRENT={MAX_CONCURRENT} RETRY_COUNT={RETRY_COUNT} "
+        f"PER_IMAGE_TIMEOUT={PER_IMAGE_TIMEOUT} MIRROR_TIMEOUT={MIRROR_TIMEOUT}"
+    )
     _log(f"TARGET: {TARGET_REGISTRY}/{TARGET_NAMESPACE}")
     await skopeo_login()
     lines = parse_images_file(IMAGES_FILE)
