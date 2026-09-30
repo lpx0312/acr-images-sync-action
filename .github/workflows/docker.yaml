@@ -38,9 +38,9 @@ jobs:
   build:
     name: Pull
     runs-on: ubuntu-latest
-    # 兜底：单镜像最坏路径（多架构 × 多源 × 重试）约 90 分钟，超过即强制终止，
-    # 避免挂在 GitHub 默认 6 小时超时上
-    timeout-minutes: 90
+    # 兜底：跨境推送 ~700MB/架构在 PUSH_TIMEOUT=1800s 预算下，
+    # 单镜像双架构一次尝试约 70 分钟，留一次重试余量
+    timeout-minutes: 150
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4

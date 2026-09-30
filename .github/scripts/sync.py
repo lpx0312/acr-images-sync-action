@@ -19,6 +19,10 @@ PER_IMAGE_TIMEOUT = int(os.getenv("PER_IMAGE_TIMEOUT", str(10 * 60)))
 # mirror.gcr.io 挂死时是 0 进度静默卡住（inspect 正常、copy 第一层就停），
 # 给它单独一个更短的超时，快速失败切回 docker.io
 MIRROR_TIMEOUT = int(os.getenv("MIRROR_TIMEOUT", str(5 * 60)))
+# 推送步超时：海外 runner → 国内仓库跨境带宽约 0.5~1MB/s/连接，
+# ~700MB 的 gzip 层 600s 传不完（ACR/SWR 均实测超时），推送单独给大预算
+PUSH_TIMEOUT = int(os.getenv("PUSH_TIMEOUT", str(30 * 60)))
+IMAGE_PARALLEL_COPIES = os.getenv("IMAGE_PARALLEL_COPIES", "8")
 LOG_FILE = os.getenv("SYNC_LOG_FILE", "sync.log")
 
 TARGET_REGISTRY = os.getenv("TARGET_REGISTRY")
@@ -333,10 +337,15 @@ async def _copy_with_recompression(
             "--retry-times", "3",
             "--format", "v2s2",
             "--dest-compress-format", "gzip",
+            # 先落盘算好 digest 再上传：重试时已传完的层会被跳过（否则从头重传），
+            # 且可用 monolithic PUT 代替 chunked PATCH
+            "--dest-precompute-digests",
+            # 跨境单连接只有 ~1MB/s，提高并行层数凑聚合带宽
+            "--image-parallel-copies", IMAGE_PARALLEL_COPIES,
             dir_ref, f"docker://{target_ref}",
         ]
         _log(f"[{index}] SKOPEO_COPY step2/2 (gzip + v2s2 push): {shlex.join(step2)}")
-        rc, out, err = await run_cmd(step2, timeout=PER_IMAGE_TIMEOUT, stream=True, log_prefix=f"[{index}] ")
+        rc, out, err = await run_cmd(step2, timeout=PUSH_TIMEOUT, stream=True, log_prefix=f"[{index}] ")
         return rc, err
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
@@ -468,7 +477,8 @@ async def main():
     _open_log()
     _log(
         f"CONFIG: MAX_CONCURRENT={MAX_CONCURRENT} RETRY_COUNT={RETRY_COUNT} "
-        f"PER_IMAGE_TIMEOUT={PER_IMAGE_TIMEOUT} MIRROR_TIMEOUT={MIRROR_TIMEOUT}"
+        f"PER_IMAGE_TIMEOUT={PER_IMAGE_TIMEOUT} MIRROR_TIMEOUT={MIRROR_TIMEOUT} "
+        f"PUSH_TIMEOUT={PUSH_TIMEOUT} IMAGE_PARALLEL_COPIES={IMAGE_PARALLEL_COPIES}"
     )
     _log(f"TARGET: {TARGET_REGISTRY}/{TARGET_NAMESPACE}")
     await skopeo_login()
