@@ -1,1 +1,1 @@
-alpine:3.19
+reg.kyverno.io/kyverno/reports-controller:v1.16.4
