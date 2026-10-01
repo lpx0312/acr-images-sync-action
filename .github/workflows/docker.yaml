@@ -1,8 +1,10 @@
 name: Docker
 
 # 仅由后端平台通过 workflow_dispatch 触发；
-# 目标仓库地址 / 命名空间 / 用户名 / 密码全部由 dispatch inputs 传入，
-# 本仓库不配置任何 vars/secrets 形式的目标仓库信息。
+# 目标仓库地址 / 命名空间 / 用户名由 dispatch inputs 传入。
+# 密码优先走仓库级 secret（平台在 dispatch 前写入 SYNC_REG_PASSWORD_*），
+# inputs 明文密码仅作为平台无法写 secret 时的回退通道——
+# workflow_dispatch 的 inputs 值对有仓库读权限的人在该 run 页面/API 可见。
 # vars/secrets 只保留源镜像仓库（Docker Hub / ghcr.io / quay.io）的拉取凭据，
 # 仅用于拉取侧加速与私有源镜像，与推送目标无关。
 on:
@@ -17,15 +19,18 @@ on:
       registry_user:
         description: '目标镜像仓库用户名'
         required: true
+      registry_password_secret:
+        description: '存放密码的 Actions secret 名称（优先通道）'
+        required: false
       registry_password:
-        description: '目标镜像仓库密码'
-        required: true
+        description: '目标镜像仓库密码（仅在无法使用 secret 时回退）'
+        required: false
 
 env:
   TARGET_REGISTRY: "${{ github.event.inputs.registry }}"
   TARGET_NAMESPACE: "${{ github.event.inputs.namespace }}"
   TARGET_USER: "${{ github.event.inputs.registry_user }}"
-  TARGET_PASSWORD: "${{ github.event.inputs.registry_password }}"
+  TARGET_PASSWORD: "${{ secrets[github.event.inputs.registry_password_secret] || github.event.inputs.registry_password }}"
   # 源镜像仓库拉取凭据（可选）：未配置则匿名拉取公共镜像
   DOCKERHUB_USERNAME: "${{ vars.DOCKERHUB_USERNAME }}"
   DOCKERHUB_PASSWORD: "${{ secrets.DOCKERHUB_PASSWORD }}"
