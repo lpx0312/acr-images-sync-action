@@ -1,1 +1,1 @@
-reg.kyverno.io/kyverno/reports-controller:v1.16.4
+registry.k8s.io/pause:3.10
