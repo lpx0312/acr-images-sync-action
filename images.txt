@@ -1,1 +1,1 @@
-jc21/nginx-proxy-manager:latest
+vaultwarden/server:1.37.4
