@@ -1,1 +1,1 @@
-registry.k8s.io/pause:3.10
+lpx03/nginx-proxy-manager:latest
