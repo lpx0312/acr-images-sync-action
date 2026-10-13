@@ -1,1 +1,1 @@
-jayfong/yapi:1.10.2
+ghcr.io/ithtelab/workbuddy-manager:latest
