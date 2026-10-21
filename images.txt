@@ -1,1 +1,1 @@
-ghcr.io/ithtelab/workbuddy-manager:latest
+dbeaver/cloudbeaver:26.2.3
