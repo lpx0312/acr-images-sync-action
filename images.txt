@@ -1,1 +1,1 @@
-jumpserver/core:v4.10.19-ce
+jumpserver/koko:v4.10.19-ce
