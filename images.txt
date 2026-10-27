@@ -1,7 +1,5 @@
-jumpserver/core:v4.10.19-ce
-jumpserver/koko:v4.10.19-ce
-jumpserver/lion:v4.10.19-ce
-jumpserver/web:v4.10.19-ce
-jumpserver/chen:v4.10.19-ce
-jumpserver/ansible-executor:latest
-openbao/openbao:2.6.0
+postgres:16.15-bookworm
+redis:7.4.10-bookworm
+grafana/loki:3.0.0
+grafana/promtail:3.0.0
+minio/minio:latest
