@@ -1,1 +1,1 @@
-openbao/openbao:2.6.0
+grafana/loki:3.0.0
