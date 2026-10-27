@@ -1,1 +1,1 @@
-jumpserver/chen:v4.10.19-ce
+jumpserver/ansible-executor:latest
