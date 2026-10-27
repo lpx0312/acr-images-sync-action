@@ -1,1 +1,1 @@
-jumpserver/lion:v4.10.19-ce
+jumpserver/web:v4.10.19-ce
