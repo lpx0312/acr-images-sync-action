@@ -1,1 +1,1 @@
-minio/minio:latest
+jumpserver/core:v4.10.19-ce
