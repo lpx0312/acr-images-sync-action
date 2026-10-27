@@ -1,5 +1,1 @@
-postgres:16.15-bookworm
-redis:7.4.10-bookworm
-grafana/loki:3.0.0
-grafana/promtail:3.0.0
-minio/minio:latest
+jumpserver/core:v4.10.19-ce
