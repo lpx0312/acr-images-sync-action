@@ -1,1 +1,1 @@
-jumpserver/ansible-executor:latest
+postgres:16.15-bookworm
