@@ -1,1 +1,1 @@
-openbao/openbao:2.6.0
+tsl0922/ttyd:1.7.8
