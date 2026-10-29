@@ -1,1 +1,1 @@
-tsl0922/ttyd:1.7.8
+filebrowser/filebrowser:v2.63.23
