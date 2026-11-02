@@ -1,1 +1,1 @@
-osixia/openldap:1.5.0
+rediscommander/redis-commander:0.9.1
