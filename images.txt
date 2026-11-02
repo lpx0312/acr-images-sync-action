@@ -1,1 +1,1 @@
-rediscommander/redis-commander:0.9.1
+ghcr.io/joeferner/redis-commander:0.9.1
