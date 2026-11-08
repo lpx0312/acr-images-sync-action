@@ -1,2 +1,1 @@
-headscale/headscale:0.29.7
-ghcr.io/tale/headplane:latest
+jc21/nginx-proxy-manager:2.16.0
