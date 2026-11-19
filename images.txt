@@ -1,1 +1,1 @@
-jc21/nginx-proxy-manager:2.16.0
+jenkins/jenkins:2.580.2-jdk21
